@@ -25,10 +25,8 @@ public class AuthResponseDto
     public string Message { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
     public JugadorDto? Jugador { get; set; }
-    // Ya tienes estos tres ↓↓↓
-// RegisterDto, LoginDto, AuthResponseDto
+}
 
-// Agrega este pequeño DTO para devolver datos del jugador en la respuesta
 public class JugadorDto
 {
     public string Id { get; set; } = string.Empty;
