@@ -1,4 +1,4 @@
-﻿using Google.Cloud.Firestore;
+using Google.Cloud.Firestore;
 using Examen_Progra_Web.API.Models;
 
 namespace Examen_Progra_Web.API.Services;
@@ -18,16 +18,16 @@ public class ParticipacionesService
         var torneoSnap = await torneoRef.GetSnapshotAsync();
         var torneo = torneoSnap.ConvertTo<Torneo>();
 
-        [cite_start]if (torneo.Estado != "próximo") throw new InvalidOperationException("El torneo ya no acepta inscripciones"); [cite: 134]
-        [cite_start]if (torneo.ParticipantesActuales >= torneo.MaxParticipantes) throw new InvalidOperationException("Torneo lleno"); [cite: 134]
-        [cite_start]if (torneo.PrecioInscripcion > 0 && !haPagado) throw new InvalidOperationException("Se requiere confirmación de pago"); [cite: 135]
+        if (torneo.Estado != "próximo") throw new InvalidOperationException("El torneo ya no acepta inscripciones");
+        if (torneo.ParticipantesActuales >= torneo.MaxParticipantes) throw new InvalidOperationException("Torneo lleno");
+        if (torneo.PrecioInscripcion > 0 && !haPagado) throw new InvalidOperationException("Se requiere confirmación de pago");
 
         var participacion = new Participacion
         {
             Id = Guid.NewGuid().ToString(),
             JugadorId = jugadorId,
             TorneoId = torneoId,
-            [cite_start]Estado = "inscrito", [cite: 136]
+            Estado = "inscrito",
             Victorias = 0,
             Derrotas = 0,
             PuntosObtenidos = 0,
