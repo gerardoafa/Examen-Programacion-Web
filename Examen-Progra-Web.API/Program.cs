@@ -37,9 +37,23 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var firebasePath = Path.Combine(AppContext.BaseDirectory, "firebase-credentials.json");
-Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", firebasePath);
-builder.Services.AddSingleton(FirestoreDb.Create("examen-programacion-web-2026"));
+try
+{
+    var firebasePath = Path.Combine(AppContext.BaseDirectory, "Config", "firebase-credentials.json");
+    if (File.Exists(firebasePath))
+    {
+        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", firebasePath);
+        builder.Services.AddSingleton(FirestoreDb.Create("examen-programacion-web-2026"));
+    }
+    else
+    {
+        Console.WriteLine("Advertencia: firebase-credentials.json no encontrado. Firestore no estará disponible.");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error inicializando Firebase: {ex.Message}");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
