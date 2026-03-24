@@ -1,119 +1,87 @@
 using Examen_Progra_Web.API.DTOs;
-using Examen_Progra_Web.API.Services.Interface;
+using Examen_Progra_Web.API.Models;
+using Examen_Progra_Web.API.Services;
+using Examen_Progra_Web.API.Services.Interface.TorneosAPI.Services;
+using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
-namespace Examen_Progra_Web.API.Controllers;
-
-[ApiController]
-[Route("api/jugadores")]
-[Authorize]
-public class JugadoresController : ControllerBase
+namespace TorneosAPI.Controllers
 {
-    private readonly IJugadoresService _jugadoresService;
-    private readonly ILogger<JugadoresController> _logger;
-
-    public JugadoresController(IJugadoresService jugadoresService, ILogger<JugadoresController> logger)
+    [ApiController]
+    [Route("api/jugadores")]
+    [Authorize]
+    public class JugadoresController : ControllerBase
     {
-        _jugadoresService = jugadoresService;
-        _logger = logger;
-    }
+        private readonly FirebaseService _firebase;
+        private readonly JwtService _jwt;
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetJugador(string id)
-    {
-        try
+        public JugadoresController(FirebaseService firebase, JwtService jwt)
         {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                return BadRequest(new { message = "El ID del jugador es requerido" });
-            }
-
-            var jugador = await _jugadoresService.GetJugadorById(id);
-            if (jugador == null)
-            {
-                return NotFound(new { message = "Jugador no encontrado" });
-            }
-
-            var jugadorDto = new JugadorDto
-            {
-                Id = jugador.Id,
-                Nombre = jugador.Nombre,
-                Apellido = jugador.Apellido,
-                Correo = jugador.Correo,
-                NombreUsuario = jugador.NombreUsuario,
-                Edad = jugador.Edad,
-                Pais = jugador.Pais,
-                Rol = jugador.Rol,
-                Activo = jugador.Activo,
-                PuntosGlobales = jugador.PuntosGlobales,
-                TorneosGanados = jugador.TorneosGanados,
-                FechaRegistro = jugador.FechaRegistro.ToDateTime(),
-                Conectado = jugador.Conectado
-            };
-
-            return Ok(jugadorDto);
+            _firebase = firebase;
+            _jwt = jwt;
         }
-        catch (Exception ex)
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> ObtenerJugador(string id)
         {
-            _logger.LogError($"Error al obtener jugador: {ex.Message}");
-            return StatusCode(500, new { message = "Error al obtener jugador" });
+            var db = _firebase.GetDb();
+            var doc = await db.Collection("jugadores").Document(id).GetSnapshotAsync();
+
+            if (!doc.Exists)
+                return NotFound(new { mensaje = "Jugador no encontrado" });
+
+            var jugador = doc.ConvertTo<Jugador>();
+
+            return Ok(new
+            {
+                id = doc.Id,
+                nombre = jugador.Nombre,
+                apellido = jugador.Apellido,
+                nombreUsuario = jugador.NombreUsuario,
+                correo = jugador.Correo,
+                edad = jugador.Edad,
+                pais = jugador.Pais,
+                rol = jugador.Rol,
+                activo = jugador.Activo,
+                puntosGlobales = jugador.PuntosGlobales,
+                torneoGanados = jugador.TorneoGanados,
+                conectado = jugador.Conectado,
+                fechaRegistro = jugador.FechaRegistro.ToDateTime()
+            });
         }
-    }
 
-    [HttpPut("{id}/perfil")]
-    public async Task<IActionResult> ActualizarPerfil(string id, [FromBody] ActualizarPerfilDto perfilDto)
-    {
-        try
+        [HttpPut("{id}/perfil")]
+        public async Task<IActionResult> ActualizarPerfil(string id, [FromBody] ActualizarPerfilDTO dto)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            var jugadorIdToken = _jwt.ObtenerJugadorId(User);
+            var rolToken = _jwt.ObtenerRol(User);
 
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return Unauthorized(new { message = "Usuario no autenticado" });
-            }
-
-            if (id != userId && userRole != "admin")
-            {
+            if (jugadorIdToken != id && rolToken != "admin")
                 return Forbid();
-            }
 
-            if (perfilDto == null)
+            if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido) ||
+                string.IsNullOrWhiteSpace(dto.Pais))
+                return BadRequest(new { mensaje = "Nombre, apellido y país son obligatorios" });
+
+            if (dto.Edad < 1)
+                return BadRequest(new { mensaje = "La edad debe ser mayor a 0" });
+
+            var db = _firebase.GetDb();
+            var doc = await db.Collection("jugadores").Document(id).GetSnapshotAsync();
+
+            if (!doc.Exists)
+                return NotFound(new { mensaje = "Jugador no encontrado" });
+
+            await doc.Reference.UpdateAsync(new Dictionary<string, object>
             {
-                return BadRequest(new { message = "El cuerpo de la petición es requerido" });
-            }
+                { "nombre", dto.Nombre },
+                { "apellido", dto.Apellido },
+                { "edad", dto.Edad },
+                { "pais", dto.Pais }
+            });
 
-            var jugadorActualizado = await _jugadoresService.ActualizarPerfil(id, perfilDto);
-            if (jugadorActualizado == null)
-            {
-                return NotFound(new { message = "Jugador no encontrado" });
-            }
-
-            var jugadorDto = new JugadorDto
-            {
-                Id = jugadorActualizado.Id,
-                Nombre = jugadorActualizado.Nombre,
-                Apellido = jugadorActualizado.Apellido,
-                Correo = jugadorActualizado.Correo,
-                NombreUsuario = jugadorActualizado.NombreUsuario,
-                Edad = jugadorActualizado.Edad,
-                Pais = jugadorActualizado.Pais,
-                Rol = jugadorActualizado.Rol,
-                Activo = jugadorActualizado.Activo,
-                PuntosGlobales = jugadorActualizado.PuntosGlobales,
-                TorneosGanados = jugadorActualizado.TorneosGanados,
-                FechaRegistro = jugadorActualizado.FechaRegistro.ToDateTime(),
-                Conectado = jugadorActualizado.Conectado
-            };
-
-            return Ok(jugadorDto);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error al actualizar perfil: {ex.Message}");
-            return StatusCode(500, new { message = "Error al actualizar perfil" });
+            return Ok(new { mensaje = "Perfil actualizado exitosamente" });
         }
     }
 }
