@@ -1,9 +1,10 @@
-﻿using Google.Cloud.Firestore;
+using Google.Cloud.Firestore;
 using Examen_Progra_Web.API.Models;
+using Examen_Progra_Web.API.Services.Interface;
 
 namespace Examen_Progra_Web.API.Services;
 
-public class JuegosService
+public class JuegosService : IJuegosService
 {
     private readonly FirestoreDb _db;
 
@@ -25,6 +26,7 @@ public class JuegosService
         juego.Id = Guid.NewGuid().ToString();
         juego.JugadoresActivos = 0;
         juego.TorneoActivos = 0;
+        juego.Estado = "disponible";
         juego.FechaAgregado = Timestamp.FromDateTime(DateTime.UtcNow);
 
         await juegosRef.Document(juego.Id).SetAsync(juego);
@@ -40,5 +42,26 @@ public class JuegosService
 
         var snapshot = await query.GetSnapshotAsync();
         return snapshot.Documents.Select(d => d.ConvertTo<Juego>()).ToList();
+    }
+
+    public async Task<Juego?> GetEstadisticasJuego(string id)
+    {
+        var doc = await _db.Collection("juegos").Document(id).GetSnapshotAsync();
+        return doc.Exists ? doc.ConvertTo<Juego>() : null;
+    }
+
+    public async Task<bool> ActualizarJuego(string id, string? descripcion, double? puntuacion, string? estado)
+    {
+        var docRef = _db.Collection("juegos").Document(id);
+        var doc = await docRef.GetSnapshotAsync();
+        if (!doc.Exists) return false;
+
+        var updates = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(descripcion)) updates["Descripcion"] = descripcion;
+        if (puntuacion.HasValue) updates["PuntuacionPromedio"] = puntuacion.Value;
+        if (!string.IsNullOrEmpty(estado)) updates["Estado"] = estado;
+
+        if (updates.Count > 0) await docRef.UpdateAsync(updates);
+        return true;
     }
 }

@@ -75,6 +75,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IJugadoresService, JugadoresService>();
 builder.Services.AddSingleton<ITorneosService, TorneosService>();
+builder.Services.AddSingleton<IJuegosService, JuegosService>();
+builder.Services.AddSingleton<IParticipacionesService, ParticipacionesService>();
 builder.Services.AddSingleton<ClasificacionesService>();
 builder.Services.AddSingleton<ReportesService>();
 
