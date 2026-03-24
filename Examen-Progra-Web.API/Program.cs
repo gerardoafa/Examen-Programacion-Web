@@ -1,3 +1,5 @@
+using Examen_Progra_Web.API.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
