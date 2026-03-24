@@ -1,6 +1,10 @@
-﻿namespace Examen_Progra_Web.API.Services.Interface;
+﻿using Examen_Progra_Web.API.Models;
 
-public class IJuegosService
+namespace Examen_Progra_Web.API.Services.Interface;
+
+public interface IJuegosService
 {
-    
+    Task<Juego> CrearJuego(Juego juego);
+    Task<List<Juego>> GetJuegosDisponibles(string? genero, string? plataforma);
+    Task<Juego?> GetEstadisticasJuego(string id);
 }
