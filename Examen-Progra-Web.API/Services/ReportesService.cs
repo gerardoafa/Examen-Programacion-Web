@@ -3,7 +3,7 @@ using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Models;
 using System.Security.Claims;
 
-namespace Examen_Progra_Web.API.Services.Interface
+namespace Examen_Progra_Web.API.Services
 {
     public class ReportesService
     {
