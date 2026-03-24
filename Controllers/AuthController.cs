@@ -1,124 +1,146 @@
-﻿using Examen_Progra_Web.API.DTOs;
+using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Models;
 using Examen_Progra_Web.API.Services;
 using Google.Cloud.Firestore;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BCrypt.Net;
 
-
-namespace TorneosAPI.Controllers
+namespace Examen_Progra_Web.API.Controllers
 {
-   
-   
-        [ApiController]
-        [Route("api/auth")]
-        public class AuthController : ControllerBase
+    [ApiController]
+    [Route("api/auth")]
+    public class AuthController : ControllerBase
+    {
+        private readonly FirebaseService _firebase;
+        private readonly JwtService _jwt;
+
+        public AuthController(FirebaseService firebase, JwtService jwt)
         {
-            private readonly FirebaseService _firebase;
-            private readonly JwtService _jwt;
+            _firebase = firebase;
+            _jwt = jwt;
+        }
 
-            public AuthController(FirebaseService firebase, JwtService jwt)
+        [HttpPost("registro")]
+        public async Task<IActionResult> Registro([FromBody] RegistroDTO dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido) ||
+                string.IsNullOrWhiteSpace(dto.Correo) || string.IsNullOrWhiteSpace(dto.Contrasena) ||
+                string.IsNullOrWhiteSpace(dto.NombreUsuario) || string.IsNullOrWhiteSpace(dto.Pais))
+                return BadRequest(new AuthResponseDto { Success = false, Message = "Todos los campos son obligatorios" });
+
+            if (dto.Edad < 1)
+                return BadRequest(new AuthResponseDto { Success = false, Message = "La edad debe ser mayor a 0" });
+
+            var db = _firebase.GetDb();
+
+            // Verificar correo único
+            var correoQuery = await db.Collection("jugadores")
+                .WhereEqualTo("correo", dto.Correo).GetSnapshotAsync();
+            if (correoQuery.Count > 0)
+                return Conflict(new AuthResponseDto { Success = false, Message = "El correo ya está registrado" });
+
+            // Verificar nombreUsuario único
+            var userQuery = await db.Collection("jugadores")
+                .WhereEqualTo("nombreUsuario", dto.NombreUsuario).GetSnapshotAsync();
+            if (userQuery.Count > 0)
+                return Conflict(new AuthResponseDto { Success = false, Message = "El nombreUsuario ya está en uso" });
+
+            var ahora = Timestamp.FromDateTime(DateTime.UtcNow);
+
+            var jugador = new Jugador
             {
-                _firebase = firebase;
-                _jwt = jwt;
-            }
+                Nombre = dto.Nombre,
+                Apellido = dto.Apellido,
+                Correo = dto.Correo,
+                Contrasena = BCrypt.Net.BCrypt.HashPassword(dto.Contrasena),
+                NombreUsuario = dto.NombreUsuario,
+                Edad = dto.Edad,
+                Pais = dto.Pais,
+                Rol = "jugador",
+                Activo = true,
+                PuntosGlobales = 0,
+                TorneoGanados = 0,
+                Conectado = false,
+                FechaRegistro = ahora,
+                UltimaConexion = ahora
+            };
 
-            [HttpPost("registro")]
-            public async Task<IActionResult> Registro([FromBody] RegistroDTO dto)
+            var docRef = await db.Collection("jugadores").AddAsync(jugador);
+            var jugadorId = docRef.Id;
+
+            // Generar token también en registro (mejora recomendada)
+            var token = _jwt.GenerarToken(jugadorId, dto.Correo, "jugador");
+
+            return Ok(new AuthResponseDto
             {
-                if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido) ||
-                    string.IsNullOrWhiteSpace(dto.Correo) || string.IsNullOrWhiteSpace(dto.Contrasena) ||
-                    string.IsNullOrWhiteSpace(dto.NombreUsuario) || string.IsNullOrWhiteSpace(dto.Pais))
-                    return BadRequest(new { mensaje = "Todos los campos son obligatorios" });
-
-                if (dto.Edad < 1)
-                    return BadRequest(new { mensaje = "La edad debe ser mayor a 0" });
-
-                var db = _firebase.GetDb();
-
-                // Verificar correo unico
-                var correoQuery = await db.Collection("jugadores")
-                    .WhereEqualTo("correo", dto.Correo).GetSnapshotAsync();
-                if (correoQuery.Count > 0)
-                    return Conflict(new { mensaje = "El correo ya está registrado" });
-
-                // Verificar nombreUsuario unico
-                var userQuery = await db.Collection("jugadores")
-                    .WhereEqualTo("nombreUsuario", dto.NombreUsuario).GetSnapshotAsync();
-                if (userQuery.Count > 0)
-                    return Conflict(new { mensaje = "El nombreUsuario ya está en uso" });
-
-                var ahora = Timestamp.FromDateTime(DateTime.UtcNow);
-
-                var jugador = new Jugador
+                Success = true,
+                Message = "Jugador registrado exitosamente",
+                Token = token,
+                Jugador = new JugadorDto
                 {
+                    Id = jugadorId,
                     Nombre = dto.Nombre,
                     Apellido = dto.Apellido,
-                    Correo = dto.Correo,
-                    Contrasena = BCrypt.Net.BCrypt.HashPassword(dto.Contrasena),
                     NombreUsuario = dto.NombreUsuario,
-                    Edad = dto.Edad,
-                    Pais = dto.Pais,
+                    Correo = dto.Correo,
                     Rol = "jugador",
-                    Activo = true,
                     PuntosGlobales = 0,
-                    TorneoGanados = 0,
-                    Conectado = false,
-                    FechaRegistro = ahora,
-                    UltimaConexion = ahora
-                };
+                    TorneosGanados = 0
+                }
+            });
+        }
 
-                var docRef = await db.Collection("jugadores").AddAsync(jugador);
+      
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDTO dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Correo) || string.IsNullOrWhiteSpace(dto.Contrasena))
+                return BadRequest(new AuthResponseDto { Success = false, Message = "Correo y contraseña son obligatorios" });
 
-                return Ok(new { mensaje = "Jugador registrado exitosamente", id = docRef.Id });
-            }
+            var db = _firebase.GetDb();
 
-            [HttpPost("login")]
-            public async Task<IActionResult> Login([FromBody] LoginDTO dto)
-            {
-                if (string.IsNullOrWhiteSpace(dto.Correo) || string.IsNullOrWhiteSpace(dto.Contrasena))
-                    return BadRequest(new { mensaje = "Correo y contraseña son obligatorios" });
+            var query = await db.Collection("jugadores")
+                .WhereEqualTo("correo", dto.Correo).GetSnapshotAsync();
 
-                var db = _firebase.GetDb();
+            if (query.Count == 0)
+                return Unauthorized(new AuthResponseDto { Success = false, Message = "Credenciales inválidas" });
 
-                var query = await db.Collection("jugadores")
-                    .WhereEqualTo("correo", dto.Correo).GetSnapshotAsync();
+            var doc = query.Documents[0];
+            var jugador = doc.ConvertTo<Jugador>();
+            jugador.Id = doc.Id;
 
-                if (query.Count == 0)
-                    return Unauthorized(new { mensaje = "Credenciales inválidas" });
+            if (!jugador.Activo)
+                return Unauthorized(new AuthResponseDto { Success = false, Message = "La cuenta está inactiva" });
 
-                var doc = query.Documents[0];
-                var jugador = doc.ConvertTo<Jugador>();
-                jugador.Id = doc.Id;
+            if (!BCrypt.Net.BCrypt.Verify(dto.Contrasena, jugador.Contrasena))
+                return Unauthorized(new AuthResponseDto { Success = false, Message = "Credenciales inválidas" });
 
-                if (!jugador.Activo)
-                    return Unauthorized(new { mensaje = "La cuenta está inactiva" });
-
-                if (!BCrypt.Net.BCrypt.Verify(dto.Contrasena, jugador.Contrasena))
-                    return Unauthorized(new { mensaje = "Credenciales inválidas" });
-
-                // Actualizar conectado y ultimaConexion
-                await doc.Reference.UpdateAsync(new Dictionary<string, object>
+            // Actualizar conectado y ultimaConexion
+            await doc.Reference.UpdateAsync(new Dictionary<string, object>
             {
                 { "conectado", true },
                 { "ultimaConexion", Timestamp.FromDateTime(DateTime.UtcNow) }
             });
 
-                var token = _jwt.GenerarToken(jugador.Id!, jugador.Correo, jugador.Rol);
+            var token = _jwt.GenerarToken(jugador.Id!, jugador.Correo, jugador.Rol);
 
-                return Ok(new
+            return Ok(new AuthResponseDto
+            {
+                Success = true,
+                Message = "Login exitoso",
+                Token = token,
+                Jugador = new JugadorDto
                 {
-                    mensaje = "Login exitoso",
-                    token,
-                    jugador = new
-                    {
-                        id = jugador.Id,
-                        nombre = jugador.Nombre,
-                        correo = jugador.Correo,
-                        rol = jugador.Rol
-                    }
-                });
-            }
+                    Id = jugador.Id,
+                    Nombre = jugador.Nombre,
+                    Apellido = jugador.Apellido,
+                    NombreUsuario = jugador.NombreUsuario,
+                    Correo = jugador.Correo,
+                    Rol = jugador.Rol,
+                    PuntosGlobales = jugador.PuntosGlobales,
+                    TorneosGanados = jugador.TorneosGanados
+                }
+            });
         }
     }
 }
