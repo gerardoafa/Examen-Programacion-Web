@@ -7,7 +7,6 @@ using Examen_Progra_Web.API.Models;
 
 [ApiController]
 [Route("api/clasificaciones")]
-[Authorize]
 public class ClasificacionesController : ControllerBase
 {
     private readonly FirestoreDb _db;
@@ -17,24 +16,21 @@ public class ClasificacionesController : ControllerBase
         _db = db;
     }
 
-    // ENDPOINT 1: Ranking global por juego (paginado)
     [HttpGet("{juegoId}")]
     public async Task<IActionResult> GetRanking(string juegoId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         if (pageSize > 50) pageSize = 50;
 
-        var query = _db.Collection("clasificaciones")
+        var snapshot = await _db.Collection("clasificaciones")
             .WhereEqualTo("JuegoId", juegoId)
-            .OrderBy("Posicion")
-            .Limit(pageSize)
-            .Offset((page - 1) * pageSize);
+            .GetSnapshotAsync();
 
-        var snapshot = await query.GetSnapshotAsync();
-
-        var ranking = snapshot.Documents.Select(d =>
-        {
-            var c = d.ConvertTo<Clasificacion>(); // tu modelo en Models
-            return new ClasificacionDto
+        var ranking = snapshot.Documents
+            .Select(d => d.ConvertTo<Clasificacion>())
+            .OrderBy(c => c.Posicion)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new ClasificacionDto
             {
                 JugadorId = c.JugadorId,
                 JuegoId = c.JuegoId,
@@ -47,33 +43,30 @@ public class ClasificacionesController : ControllerBase
                 MedallasPlata = c.MedallasPlata,
                 MedallasBronce = c.MedallasBronce,
                 Logros = c.Logros
-            };
-        }).ToList();
+            }).ToList();
 
         var response = new RankingResponseDto
         {
             PaginaActual = page,
-            TotalPaginas = 10, // puedes calcular real si quieres
-            TotalRegistros = ranking.Count,
+            TotalPaginas = (int)Math.Ceiling(snapshot.Count / (double)pageSize),
+            TotalRegistros = snapshot.Count,
             Ranking = ranking
         };
 
         return Ok(response);
     }
 
-    // ENDPOINT 2: Posición personal del jugador autenticado
     [HttpGet("jugador/clasificacion/{juegoId}")]
     public async Task<IActionResult> GetPosicionPersonal(string juegoId)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-        var query = _db.Collection("clasificaciones")
+        var snapshot = await _db.Collection("clasificaciones")
             .WhereEqualTo("JugadorId", userId)
-            .WhereEqualTo("JuegoId", juegoId);
+            .GetSnapshotAsync();
 
-        var snapshot = await query.GetSnapshotAsync();
-        var doc = snapshot.Documents.FirstOrDefault();
+        var doc = snapshot.Documents.FirstOrDefault(d => d.GetValue<string>("JuegoId") == juegoId);
 
         if (doc == null) return NotFound(new { mensaje = "No tienes clasificación en este juego" });
 

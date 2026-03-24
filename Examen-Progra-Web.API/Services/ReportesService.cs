@@ -1,7 +1,6 @@
 using Google.Cloud.Firestore;
 using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Models;
-using System.Security.Claims;
 
 namespace Examen_Progra_Web.API.Services
 {
@@ -14,55 +13,63 @@ namespace Examen_Progra_Web.API.Services
             _db = db;
         }
 
-        // ENDPOINT 3: Top 10 torneos más populares (últimos 30 días) - Escenario 5
         public async Task<List<TorneoPopularDto>> GetTorneosPopularesAsync()
         {
-            var fechaLimite = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(-30));
+            var snapshot = await _db.Collection("torneos")
+                .Limit(50)
+                .GetSnapshotAsync();
 
-            var query = _db.Collection("torneos")
-                .WhereGreaterThan("fechaCreacion", fechaLimite)
-                .OrderByDescending("participantesActuales")
-                .Limit(10);
+            var torneos = snapshot.Documents
+                .Select(d => new
+                {
+                    Doc = d,
+                    Nombre = d.GetValue<string>("Nombre"),
+                    Juego = d.GetValue<string>("Juego"),
+                    ParticipantesActuales = d.GetValue<int>("ParticipantesActuales"),
+                    PremioTotal = d.GetValue<double>("PremioTotal"),
+                    Estado = d.GetValue<string>("Estado"),
+                    FechaCreacion = d.GetValue<Timestamp>("FechaCreacion")
+                })
+                .Where(t => t.FechaCreacion != null && t.FechaCreacion.ToDateTime() >= DateTime.UtcNow.AddDays(-30))
+                .OrderByDescending(t => t.ParticipantesActuales)
+                .Take(10)
+                .Select(t => new TorneoPopularDto
+                {
+                    Nombre = t.Nombre,
+                    Juego = t.Juego,
+                    Inscripciones = t.ParticipantesActuales,
+                    PremioTotal = t.PremioTotal,
+                    Estado = t.Estado
+                }).ToList();
 
-            var snapshot = await query.GetSnapshotAsync();
-
-            return snapshot.Documents.Select(d => new TorneoPopularDto
-            {
-                Nombre = d.GetValue<string>("nombre"),
-                Juego = d.GetValue<string>("juego"),
-                Inscripciones = d.GetValue<int>("participantesActuales"),
-                PremioTotal = d.GetValue<double>("premioTotal"),
-                Estado = d.GetValue<string>("estado")
-            }).ToList();
+            return torneos;
         }
 
-        // ENDPOINT 4: Top 20 jugadores destacados globales
         public async Task<List<JugadorDestacadoDto>> GetJugadoresDestacadosAsync()
         {
-            var query = _db.Collection("jugadores")
-                .OrderByDescending("puntosGlobales")
-                .Limit(20);
+            var snapshot = await _db.Collection("jugadores")
+                .Limit(100)
+                .GetSnapshotAsync();
 
-            var snapshot = await query.GetSnapshotAsync();
-
-            return snapshot.Documents.Select(d => new JugadorDestacadoDto
-            {
-                Nombre = d.GetValue<string>("nombre"),
-                PuntosGlobales = d.GetValue<int>("puntosGlobales"),
-                TorneosGanados = d.GetValue<int>("torneoGanados")
-            }).ToList();
+            return snapshot.Documents
+                .Select(d => new JugadorDestacadoDto
+                {
+                    Nombre = d.GetValue<string>("Nombre") + " " + d.GetValue<string>("Apellido"),
+                    PuntosGlobales = d.GetValue<int>("PuntosGlobales"),
+                    TorneosGanados = d.GetValue<int>("TorneosGanados")
+                })
+                .OrderByDescending(j => j.PuntosGlobales)
+                .Take(20)
+                .ToList();
         }
 
-        // ENDPOINT 5: Mi desempeño personal en un juego
         public async Task<MiDesempenoDto?> GetMiDesempenoAsync(string juegoId, string userId)
         {
-            var query = _db.Collection("clasificaciones")
+            var snapshot = await _db.Collection("clasificaciones")
                 .WhereEqualTo("JugadorId", userId)
-                .WhereEqualTo("JuegoId", juegoId);
+                .GetSnapshotAsync();
 
-            var snapshot = await query.GetSnapshotAsync();
-            var doc = snapshot.Documents.FirstOrDefault();
-
+            var doc = snapshot.Documents.FirstOrDefault(d => d.GetValue<string>("JuegoId") == juegoId);
             if (doc == null) return null;
 
             var c = doc.ConvertTo<Clasificacion>();
@@ -77,19 +84,28 @@ namespace Examen_Progra_Web.API.Services
             };
         }
 
-        // ENDPOINT 6: Tendencias (solo admin)
         public async Task<TendenciasDto> GetTendenciasAsync()
         {
-            var juegosPopulares = await _db.Collection("juegos")
-                .OrderByDescending("torneoActivos")
-                .Limit(5)
+            var snapshot = await _db.Collection("juegos")
+                .Limit(50)
                 .GetSnapshotAsync();
+
+            var juegos = snapshot.Documents
+                .Select(d => new
+                {
+                    Titulo = d.GetValue<string>("Titulo"),
+                    TorneoActivos = d.GetValue<int>("TorneoActivos")
+                })
+                .OrderByDescending(j => j.TorneoActivos)
+                .Take(5)
+                .Select(j => j.Titulo)
+                .ToList();
 
             return new TendenciasDto
             {
-                JuegosMasPopulares = juegosPopulares.Documents.Select(d => d.GetValue<string>("titulo")).ToList(),
+                JuegosMasPopulares = juegos,
                 HoraPicoActividad = "20:00 - 23:00",
-                TotalTorneosActivos = 42
+                TotalTorneosActivos = 0
             };
         }
     }

@@ -4,7 +4,7 @@ namespace Examen_Progra_Web.API.Services.Interface;
 
 public interface IParticipacionesService
 {
-    Task InscribirJugador(string torneoId, string jugadorId, bool haPagado);
+    Task<string> InscribirJugador(string torneoId, string jugadorId, bool haPagado);
     Task<List<Participacion>> GetParticipantesTorneo(string torneoId);
     Task<bool> ActualizarResultado(string participacionId, bool victoria, int puntosPartida);
     Task<List<Participacion>> GetMisTorneos(string jugadorId);

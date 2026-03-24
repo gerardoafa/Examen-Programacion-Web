@@ -67,12 +67,14 @@ public class JugadoresService : IJugadoresService
     {
         try
         {
-            var query = _db.Collection("jugadores")
-                .OrderByDescending("PuntosGlobales")
-                .Limit(100);
+            var snapshot = await _db.Collection("jugadores")
+                .Limit(100)
+                .GetSnapshotAsync();
 
-            var snapshot = await query.GetSnapshotAsync();
-            return snapshot.Documents.Select(d => d.ConvertTo<Jugador>()).ToList();
+            return snapshot.Documents
+                .Select(d => d.ConvertTo<Jugador>())
+                .OrderByDescending(j => j.PuntosGlobales)
+                .ToList();
         }
         catch
         {

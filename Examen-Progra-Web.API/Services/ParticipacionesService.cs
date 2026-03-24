@@ -13,7 +13,7 @@ public class ParticipacionesService : IParticipacionesService
         _db = db;
     }
 
-    public async Task InscribirJugador(string torneoId, string jugadorId, bool haPagado)
+    public async Task<string> InscribirJugador(string torneoId, string jugadorId, bool haPagado)
     {
         var torneoRef = _db.Collection("torneos").Document(torneoId);
         var torneoSnap = await torneoRef.GetSnapshotAsync();
@@ -46,6 +46,7 @@ public class ParticipacionesService : IParticipacionesService
 
         await _db.Collection("participaciones").Document(participacion.Id).SetAsync(participacion);
         await torneoRef.UpdateAsync("ParticipantesActuales", FieldValue.Increment(1));
+        return participacion.Id;
     }
 
     public async Task<List<Participacion>> GetParticipantesTorneo(string torneoId)

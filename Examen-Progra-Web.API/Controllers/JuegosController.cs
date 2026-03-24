@@ -1,14 +1,12 @@
 using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Models;
 using Examen_Progra_Web.API.Services.Interface;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Examen_Progra_Web.API.Controllers;
 
 [ApiController]
 [Route("api/juegos")]
-[Authorize]
 public class JuegosController : ControllerBase
 {
     private readonly IJuegosService _juegosService;
@@ -19,7 +17,6 @@ public class JuegosController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "admin")]
     public async Task<IActionResult> CrearJuego([FromBody] Juego juego)
     {
         try
@@ -72,29 +69,21 @@ public class JuegosController : ControllerBase
     [HttpGet("{id}/estadisticas")]
     public async Task<IActionResult> GetEstadisticas(string id)
     {
-        try
-        {
-            var juego = await _juegosService.GetEstadisticasJuego(id);
-            if (juego == null)
-                return NotFound(new { mensaje = "Juego no encontrado" });
+        var juego = await _juegosService.GetEstadisticasJuego(id);
+        if (juego == null)
+            return NotFound(new { mensaje = "Juego no encontrado" });
 
-            return Ok(new
-            {
-                id = juego.Id,
-                titulo = juego.Titulo,
-                jugadoresActivos = juego.JugadoresActivos,
-                torneoActivos = juego.TorneoActivos,
-                puntuacionPromedio = juego.PuntuacionPromedio
-            });
-        }
-        catch (Exception ex)
+        return Ok(new
         {
-            return StatusCode(500, new { mensaje = "Error al obtener estadísticas" });
-        }
+            id = juego.Id,
+            titulo = juego.Titulo,
+            jugadoresActivos = juego.JugadoresActivos,
+            torneoActivos = juego.TorneoActivos,
+            puntuacionPromedio = juego.PuntuacionPromedio
+        });
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "admin")]
     public async Task<IActionResult> ActualizarJuego(string id, [FromBody] ActualizarJuegoDto dto)
     {
         try

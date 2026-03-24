@@ -1,14 +1,11 @@
 using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Services.Interface;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Examen_Progra_Web.API.Controllers;
 
 [ApiController]
 [Route("api/jugadores")]
-[Authorize]
 public class JugadoresController : ControllerBase
 {
     private readonly IJugadoresService _jugadoresService;
@@ -46,12 +43,6 @@ public class JugadoresController : ControllerBase
     [HttpPut("{id}/perfil")]
     public async Task<IActionResult> ActualizarPerfil(string id, [FromBody] ActualizarPerfilDto dto)
     {
-        var jugadorIdToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var rolToken = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (jugadorIdToken != id && rolToken != "admin")
-            return Forbid();
-
         var resultado = await _jugadoresService.UpdatePerfil(id, dto);
         if (!resultado)
             return NotFound(new { mensaje = "Jugador no encontrado" });
