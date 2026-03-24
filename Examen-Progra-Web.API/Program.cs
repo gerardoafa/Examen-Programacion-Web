@@ -43,7 +43,7 @@ try
     if (File.Exists(firebasePath))
     {
         Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", firebasePath);
-        builder.Services.AddSingleton(FirestoreDb.Create("examen-programacion-web-2026"));
+        builder.Services.AddSingleton(FirestoreDb.Create("examen-progra-web-1a261"));
     }
     else
     {
