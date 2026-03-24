@@ -5,17 +5,17 @@ using Google.Cloud.Firestore;
 
 
 
-public class FirebaseService
-{
-    private readonly FirestoreDb _db;
-
-    public FirebaseService(IConfiguration configuration)
+    public class FirebaseService
     {
-        string credentialsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "firebase-credentials.json");
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", credentialsPath);
-        string projectId = configuration["Firebase:ProjectId"]!;
-        _db = FirestoreDb.Create(projectId);
-    }
+        private readonly FirestoreDb _db;
 
-    public FirestoreDb GetDb() => _db;
-}
+        public FirebaseService(IConfiguration configuration)
+        {
+            string credentialsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "firebase-credentials.json");
+            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", credentialsPath);
+            string projectId = configuration["Firebase:ProjectId"]!;
+            _db = FirestoreDb.Create(projectId);
+        }
+
+        public FirestoreDb GetDb() => _db;
+    }
