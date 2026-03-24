@@ -6,7 +6,9 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+builder.Services.AddSingleton<ClasificacionesService>();
+builder.Services.AddSingleton<ReportesService>();
+// (los demás services ya deben estar registrados)
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

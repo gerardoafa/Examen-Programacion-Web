@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Google.Cloud.Firestore;
 using Examen_Progra_Web.API.DTOs;
 using System.Security.Claims;
+using Examen_Progra_Web.API.Models;
 
 [ApiController]
 [Route("api/reports")]
