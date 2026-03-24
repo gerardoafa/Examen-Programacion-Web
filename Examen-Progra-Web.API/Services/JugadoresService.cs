@@ -14,11 +14,11 @@ public class JugadoresService : IJugadoresService
         _db = db;
     }
 
-    public async Task<Jugador?> GetJugadorById(string jugadorId)
+    public async Task<Jugador?> GetJugadorPublico(string id)
     {
         try
         {
-            var doc = await _db.Collection("jugadores").Document(jugadorId).GetSnapshotAsync();
+            var doc = await _db.Collection("jugadores").Document(id).GetSnapshotAsync();
             return doc.Exists ? doc.ConvertTo<Jugador>() : null;
         }
         catch
@@ -27,51 +27,56 @@ public class JugadoresService : IJugadoresService
         }
     }
 
-    public async Task<Jugador?> ActualizarPerfil(string jugadorId, ActualizarPerfilDto perfilDto)
+    public async Task<bool> UpdatePerfil(string id, ActualizarPerfilDto perfilDto)
     {
         try
         {
-            var docRef = _db.Collection("jugadores").Document(jugadorId);
+            var docRef = _db.Collection("jugadores").Document(id);
             var doc = await docRef.GetSnapshotAsync();
 
-            if (!doc.Exists)
-            {
-                return null;
-            }
+            if (!doc.Exists) return false;
 
             var updates = new Dictionary<string, object>();
 
             if (!string.IsNullOrWhiteSpace(perfilDto.Nombre))
-            {
                 updates["Nombre"] = perfilDto.Nombre;
-            }
 
             if (!string.IsNullOrWhiteSpace(perfilDto.Apellido))
-            {
                 updates["Apellido"] = perfilDto.Apellido;
-            }
 
             if (perfilDto.Edad > 0)
-            {
                 updates["Edad"] = perfilDto.Edad;
-            }
 
             if (!string.IsNullOrWhiteSpace(perfilDto.Pais))
-            {
                 updates["Pais"] = perfilDto.Pais;
-            }
 
             if (updates.Count > 0)
             {
                 await docRef.UpdateAsync(updates);
             }
 
-            var updatedDoc = await docRef.GetSnapshotAsync();
-            return updatedDoc.ConvertTo<Jugador>();
+            return true;
         }
         catch
         {
-            return null;
+            return false;
+        }
+    }
+
+    public async Task<List<Jugador>> GetRankingGlobal()
+    {
+        try
+        {
+            var query = _db.Collection("jugadores")
+                .OrderByDescending("PuntosGlobales")
+                .Limit(100);
+
+            var snapshot = await query.GetSnapshotAsync();
+            return snapshot.Documents.Select(d => d.ConvertTo<Jugador>()).ToList();
+        }
+        catch
+        {
+            return new List<Jugador>();
         }
     }
 }

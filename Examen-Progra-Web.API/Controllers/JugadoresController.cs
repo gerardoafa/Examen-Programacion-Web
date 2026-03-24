@@ -1,87 +1,68 @@
 using Examen_Progra_Web.API.DTOs;
-using Examen_Progra_Web.API.Models;
-using Examen_Progra_Web.API.Services;
-using Examen_Progra_Web.API.Services.Interface.TorneosAPI.Services;
-using Google.Cloud.Firestore;
+using Examen_Progra_Web.API.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
-namespace TorneosAPI.Controllers
+namespace Examen_Progra_Web.API.Controllers;
+
+[ApiController]
+[Route("api/jugadores")]
+[Authorize]
+public class JugadoresController : ControllerBase
 {
-    [ApiController]
-    [Route("api/jugadores")]
-    [Authorize]
-    public class JugadoresController : ControllerBase
+    private readonly IJugadoresService _jugadoresService;
+
+    public JugadoresController(IJugadoresService jugadoresService)
     {
-        private readonly FirebaseService _firebase;
-        private readonly JwtService _jwt;
+        _jugadoresService = jugadoresService;
+    }
 
-        public JugadoresController(FirebaseService firebase, JwtService jwt)
+    [HttpGet("{id}")]
+    public async Task<IActionResult> ObtenerJugador(string id)
+    {
+        var jugador = await _jugadoresService.GetJugadorPublico(id);
+        if (jugador == null)
+            return NotFound(new { mensaje = "Jugador no encontrado" });
+
+        return Ok(new
         {
-            _firebase = firebase;
-            _jwt = jwt;
-        }
+            id = jugador.Id,
+            nombre = jugador.Nombre,
+            apellido = jugador.Apellido,
+            nombreUsuario = jugador.NombreUsuario,
+            correo = jugador.Correo,
+            edad = jugador.Edad,
+            pais = jugador.Pais,
+            rol = jugador.Rol,
+            activo = jugador.Activo,
+            puntosGlobales = jugador.PuntosGlobales,
+            torneoGanados = jugador.TorneosGanados,
+            conectado = jugador.Conectado,
+            fechaRegistro = jugador.FechaRegistro.ToDateTime()
+        });
+    }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> ObtenerJugador(string id)
-        {
-            var db = _firebase.GetDb();
-            var doc = await db.Collection("jugadores").Document(id).GetSnapshotAsync();
+    [HttpPut("{id}/perfil")]
+    public async Task<IActionResult> ActualizarPerfil(string id, [FromBody] ActualizarPerfilDto dto)
+    {
+        var jugadorIdToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var rolToken = User.FindFirst(ClaimTypes.Role)?.Value;
 
-            if (!doc.Exists)
-                return NotFound(new { mensaje = "Jugador no encontrado" });
+        if (jugadorIdToken != id && rolToken != "admin")
+            return Forbid();
 
-            var jugador = doc.ConvertTo<Jugador>();
+        var resultado = await _jugadoresService.UpdatePerfil(id, dto);
+        if (!resultado)
+            return NotFound(new { mensaje = "Jugador no encontrado" });
 
-            return Ok(new
-            {
-                id = doc.Id,
-                nombre = jugador.Nombre,
-                apellido = jugador.Apellido,
-                nombreUsuario = jugador.NombreUsuario,
-                correo = jugador.Correo,
-                edad = jugador.Edad,
-                pais = jugador.Pais,
-                rol = jugador.Rol,
-                activo = jugador.Activo,
-                puntosGlobales = jugador.PuntosGlobales,
-                torneoGanados = jugador.TorneoGanados,
-                conectado = jugador.Conectado,
-                fechaRegistro = jugador.FechaRegistro.ToDateTime()
-            });
-        }
+        return Ok(new { mensaje = "Perfil actualizado exitosamente" });
+    }
 
-        [HttpPut("{id}/perfil")]
-        public async Task<IActionResult> ActualizarPerfil(string id, [FromBody] ActualizarPerfilDTO dto)
-        {
-            var jugadorIdToken = _jwt.ObtenerJugadorId(User);
-            var rolToken = _jwt.ObtenerRol(User);
-
-            if (jugadorIdToken != id && rolToken != "admin")
-                return Forbid();
-
-            if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido) ||
-                string.IsNullOrWhiteSpace(dto.Pais))
-                return BadRequest(new { mensaje = "Nombre, apellido y país son obligatorios" });
-
-            if (dto.Edad < 1)
-                return BadRequest(new { mensaje = "La edad debe ser mayor a 0" });
-
-            var db = _firebase.GetDb();
-            var doc = await db.Collection("jugadores").Document(id).GetSnapshotAsync();
-
-            if (!doc.Exists)
-                return NotFound(new { mensaje = "Jugador no encontrado" });
-
-            await doc.Reference.UpdateAsync(new Dictionary<string, object>
-            {
-                { "nombre", dto.Nombre },
-                { "apellido", dto.Apellido },
-                { "edad", dto.Edad },
-                { "pais", dto.Pais }
-            });
-
-            return Ok(new { mensaje = "Perfil actualizado exitosamente" });
-        }
+    [HttpGet("ranking")]
+    public async Task<IActionResult> GetRanking()
+    {
+        var ranking = await _jugadoresService.GetRankingGlobal();
+        return Ok(ranking);
     }
 }
