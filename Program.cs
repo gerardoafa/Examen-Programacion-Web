@@ -14,6 +14,7 @@ builder.Services.AddSwaggerGen();
 
 // Firebase
 builder.Services.AddSingleton<FirebaseService>();
+builder.Services.AddSingleton<ClasificacionesService>();
 
 // JWT
 builder.Services.AddSingleton<JwtService>();
