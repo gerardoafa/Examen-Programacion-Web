@@ -1,10 +1,11 @@
-﻿using Google.Cloud.Firestore;
-using Examen_Progra_Web.API.Models;
 using Examen_Progra_Web.API.DTOs;
+using Examen_Progra_Web.API.Models;
+using Examen_Progra_Web.API.Services.Interface;
+using Google.Cloud.Firestore;
 
 namespace Examen_Progra_Web.API.Services;
 
-public class JugadoresService
+public class JugadoresService : IJugadoresService
 {
     private readonly FirestoreDb _db;
 
@@ -13,67 +14,64 @@ public class JugadoresService
         _db = db;
     }
 
-    public async Task<Jugador?> GetJugadorPublico(string id)
+    public async Task<Jugador?> GetJugadorById(string jugadorId)
     {
-        var docRef = _db.Collection("jugadores").Document(id);
-        var snapshot = await docRef.GetSnapshotAsync();
-
-        if (!snapshot.Exists)
+        try
+        {
+            var doc = await _db.Collection("jugadores").Document(jugadorId).GetSnapshotAsync();
+            return doc.Exists ? doc.ConvertTo<Jugador>() : null;
+        }
+        catch
         {
             return null;
         }
-
-        var jugador = snapshot.ConvertTo<Jugador>();
-        
-        // Limpiamos la contraseña por seguridad antes de retornar
-        jugador.Contrasena = string.Empty; 
-        
-        return jugador;
     }
 
-    public async Task<bool> UpdatePerfil(string id, UpdatePerfilDto perfilDto)
+    public async Task<Jugador?> ActualizarPerfil(string jugadorId, ActualizarPerfilDto perfilDto)
     {
-        var docRef = _db.Collection("jugadores").Document(id);
-        var snapshot = await docRef.GetSnapshotAsync();
-
-        if (!snapshot.Exists)
-        {
-            throw new KeyNotFoundException("El jugador no existe");
-        }
-
-        [cite_start]// El examen especifica que no se debe modificar correo ni nombreUsuario 
-        var actualizaciones = new Dictionary<string, object>
-        {
-            { "Nombre", perfilDto.Nombre },
-            { "Apellido", perfilDto.Apellido },
-            { "Edad", perfilDto.Edad },
-            { "Pais", perfilDto.Pais },
-            { "UltimaConexion", Timestamp.FromDateTime(DateTime.UtcNow) }
-        };
-
         try
         {
-            await docRef.UpdateAsync(actualizaciones);
-            return true;
+            var docRef = _db.Collection("jugadores").Document(jugadorId);
+            var doc = await docRef.GetSnapshotAsync();
+
+            if (!doc.Exists)
+            {
+                return null;
+            }
+
+            var updates = new Dictionary<string, object>();
+
+            if (!string.IsNullOrWhiteSpace(perfilDto.Nombre))
+            {
+                updates["Nombre"] = perfilDto.Nombre;
+            }
+
+            if (!string.IsNullOrWhiteSpace(perfilDto.Apellido))
+            {
+                updates["Apellido"] = perfilDto.Apellido;
+            }
+
+            if (perfilDto.Edad > 0)
+            {
+                updates["Edad"] = perfilDto.Edad;
+            }
+
+            if (!string.IsNullOrWhiteSpace(perfilDto.Pais))
+            {
+                updates["Pais"] = perfilDto.Pais;
+            }
+
+            if (updates.Count > 0)
+            {
+                await docRef.UpdateAsync(updates);
+            }
+
+            var updatedDoc = await docRef.GetSnapshotAsync();
+            return updatedDoc.ConvertTo<Jugador>();
         }
-        catch (Exception)
+        catch
         {
-            return false;
+            return null;
         }
-    }
-
-    public async Task<List<Jugador>> GetRankingGlobal()
-    {
-        [cite_start]// Consulta para el Escenario 5: Jugadores con mayor puntaje global [cite: 156]
-        var snapshot = await _db.Collection("jugadores")
-            .OrderByDescending("PuntosGlobales")
-            .Limit(20)
-            .GetSnapshotAsync();
-
-        return snapshot.Documents.Select(d => {
-            var j = d.ConvertTo<Jugador>();
-            j.Contrasena = string.Empty;
-            return j;
-        }).ToList();
     }
 }
