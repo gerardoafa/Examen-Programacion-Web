@@ -1,17 +1,17 @@
 using Google.Cloud.Firestore;
 using Examen_Progra_Web.API.DTOs;
 using Examen_Progra_Web.API.Models;
-using System.Security.Claims;
+using Examen_Progra_Web.API.Services;   // ← Este using es clave
 
 namespace Examen_Progra_Web.API.Services
 {
     public class ClasificacionesService
     {
-        private readonly FirestoreDb _db;
+        private readonly FirebaseService _firebase;
 
-        public ClasificacionesService(FirestoreDb db)
+        public ClasificacionesService(FirebaseService firebase)
         {
-            _db = db;
+            _firebase = firebase;
         }
 
         // ENDPOINT 1: Ranking global por juego (paginado)
@@ -19,7 +19,9 @@ namespace Examen_Progra_Web.API.Services
         {
             if (pageSize > 50) pageSize = 50;
 
-            var query = _db.Collection("clasificaciones")
+            var db = _firebase.GetDb();   // ← Aquí está la corrección
+
+            var query = db.Collection("clasificaciones")
                 .WhereEqualTo("JuegoId", juegoId)
                 .OrderBy("Posicion")
                 .Limit(pageSize)
@@ -58,7 +60,9 @@ namespace Examen_Progra_Web.API.Services
         // ENDPOINT 2: Posición personal del jugador autenticado
         public async Task<MiDesempenoDto?> GetPosicionPersonalAsync(string juegoId, string userId)
         {
-            var query = _db.Collection("clasificaciones")
+            var db = _firebase.GetDb();   // ← Aquí también
+
+            var query = db.Collection("clasificaciones")
                 .WhereEqualTo("JugadorId", userId)
                 .WhereEqualTo("JuegoId", juegoId);
 
